@@ -9,7 +9,7 @@ from sklearn.metrics import accuracy_score
 st.title('Heart Disease Prediction')
 
 # Load dataset directly
-heart_data = pd.read_csv(r'C:\Users\userm\OneDrive\Desktop\HeartDisease\dataset.csv')
+heart_data = pd.read_csv('dataset.csv')
 
 
 # Data preprocessing and model training
