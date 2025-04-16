@@ -11,36 +11,34 @@ from datetime import datetime
 # -------------------- Firebase Setup --------------------
 if not firebase_admin._apps:
     try:
-        # Convert the dictionary from st.secrets to a valid format
-        firebase_config = st.secrets["firebase"]
-        cred = credentials.Certificate(firebase_config)  # This should work now
+        # Load Firebase credentials from st.secrets as a dictionary
+        firebase_config = dict(st.secrets["firebase"])
 
-        # Initialize Firebase Admin SDK
+        # Convert st.secrets to a credential certificate
+        cred = credentials.Certificate(firebase_config)
         firebase_admin.initialize_app(cred)
         db = firestore.client()  # Firebase Firestore client initialization
-        st.success("Firebase Initialized Successfully.")
+        st.success("✅ Firebase Initialized Successfully.")
     except Exception as e:
-        st.error(f"Error initializing Firebase: {e}")
+        st.error(f"❌ Error initializing Firebase: {e}")
 
 # -------------------- Title --------------------
-st.title('Heart Disease Prediction App')
+st.title('❤️ Heart Disease Prediction App')
 
 # -------------------- Load Dataset --------------------
 @st.cache_data
 def load_data():
-    # Load the dataset and handle exceptions if the file is missing or incorrect
     try:
         heart_data = pd.read_csv('dataset.csv')
         return heart_data
     except FileNotFoundError:
-        st.error("Dataset not found. Please check the file path.")
+        st.error("❌ Dataset not found. Please check the file path.")
     except Exception as e:
-        st.error(f"Error loading dataset: {e}")
+        st.error(f"❌ Error loading dataset: {e}")
 
 heart_data = load_data()
 
 # -------------------- Data Preprocessing --------------------
-# Check if the dataset loaded successfully
 if heart_data is not None:
     X = heart_data.drop(columns='target', axis=1)
     Y = heart_data['target']
@@ -58,38 +56,32 @@ if heart_data is not None:
     st.write(f"✅ Training Accuracy: *{train_accuracy:.2f}*")
     st.write(f"✅ Test Accuracy: *{test_accuracy:.2f}*")
 
-# -------------------- User Input --------------------
-st.subheader("🧾 Enter Patient Details for Prediction")
+    # -------------------- User Input --------------------
+    st.subheader("🧾 Enter Patient Details for Prediction")
+    user_input = []
+    for col in X.columns:
+        value = st.number_input(f"{col}", min_value=0.0, value=0.0)
+        user_input.append(value)
 
-user_input = []
-for col in X.columns:
-    # Adding input validation for user input
-    value = st.number_input(f"{col}", min_value=0.0, value=0.0)
-    user_input.append(value)
+    # -------------------- Predict Button --------------------
+    if st.button('🔍 Predict'):
+        try:
+            input_array = np.asarray(user_input).reshape(1, -1)
+            prediction = model.predict(input_array)
 
-# -------------------- Predict Button --------------------
-if st.button('🔍 Predict'):
-    try:
-        # Convert the user input into a numpy array for prediction
-        input_array = np.asarray(user_input).reshape(1, -1)
-        prediction = model.predict(input_array)
+            result = 'has heart disease' if prediction[0] == 1 else 'does NOT have heart disease'
+            st.success(f"The person {result}.")
 
-        # Display the result to the user
-        result = 'has heart disease 💔' if prediction[0] == 1 else 'does NOT have heart disease ❤️'
-        st.success(f"The person {result}")
+            # -------------------- Save Prediction to Firestore --------------------
+            now = datetime.now()
+            doc_name = f"heart_{prediction[0]}_{now.strftime('%Y%m%d%H%M%S')}"
 
-        # -------------------- Save Prediction to Firestore --------------------
-        now = datetime.now()
-        doc_name = f"heart_{prediction[0]}{now.strftime('%Y%m%d%H%M%S')}"
-        
-        # Store the input data and prediction in Firestore
-        doc_data = {col: val for col, val in zip(X.columns, user_input)}
-        doc_data["prediction"] = int(prediction[0])
-        doc_data["timestamp"] = now.strftime("%Y-%m-%d %H:%M:%S")
+            doc_data = {col: val for col, val in zip(X.columns, user_input)}
+            doc_data["prediction"] = int(prediction[0])
+            doc_data["timestamp"] = now.strftime("%Y-%m-%d %H:%M:%S")
 
-        db.collection("heart_predictions").document(doc_name).set(doc_data)
-        st.info(f"✅ Prediction saved as document: {doc_name}")
+            db.collection("heart_predictions").document(doc_name).set(doc_data)
+            st.info(f"✅ Prediction saved to Firestore: {doc_name}")
 
-    except Exception as e:
-        # Improved error handling during prediction
-        st.error(f"⚠️ Error during prediction: {e}")
+        except Exception as e:
+            st.error(f"⚠️ Error during prediction: {e}")
