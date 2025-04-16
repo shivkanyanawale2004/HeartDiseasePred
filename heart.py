@@ -23,7 +23,7 @@ if not firebase_admin._apps:
         st.error(f"Error initializing Firebase: {e}")
 
 # -------------------- Title --------------------
-st.title('❤️ Heart Disease Prediction App')
+st.title('Heart Disease Prediction App')
 
 # -------------------- Load Dataset --------------------
 @st.cache_data
